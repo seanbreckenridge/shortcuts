@@ -1,0 +1,248 @@
+#!/usr/bin/env ruby
+
+require "set"
+require "pathname"
+require "fileutils"
+
+require "docopt"
+require "toml-rb"
+
+VERSION = "0.1.0"
+
+$doc = <<DOCOPT
+shortcuts #{VERSION}
+
+Creates shortcut shell scripts from a configuration file.
+See https://github.com/seanbreckenridge/shortcuts for more information
+
+Usage:
+  shortcuts create
+  shortcuts create [--conf=<FILE>] [--shortcuts-dir=<DIR>]
+  shortcuts create [--debug]
+  shortcuts -h | --help
+
+Options:
+  -h --help               Print the help message
+  -d --debug              Print debug information
+  --conf=<FILE>           Specify a configuration file
+                          [default ~/.config/shortcuts.conf]
+  --shortcuts-dir=<DIR>   Specify a shortcuts directory
+                          [default ~/.shortcuts/]
+
+DOCOPT
+
+$is_debug = false
+$default = { :shebang => "#!/bin/sh", :mode => 0700 }  # 0700 is octal
+
+$required_keys = ["command"]
+$allowed_keys = ["command", "shebang", "link", "links", "mode"]
+
+def debug(msg)
+  if $is_debug
+    puts msg
+  end
+end
+
+class Shortcut
+  attr_reader :command, :mode, :links, :shebang, :name
+
+  def initialize(name, toml_hash)
+    if toml_hash.is_a?(Hash)
+      # check for invalid keys
+      invalid_keys = toml_hash.keys - $allowed_keys
+      unless invalid_keys.empty?
+        abort "Error: shortcut '#{name}' unrecognized option: #{invalid_keys.first}"
+      end
+      # check for required keys
+      $required_keys.each do |req|
+        unless toml_hash.key?(req)
+          abort "Error: shortcut '#{name}' is missing a required key: #{req}"
+        end
+      end
+    end
+    toml_hash.each do |key, val|
+      case key
+      when "command"
+        unless val.is_a?(String)
+          abort "Error: shortcut '#{name}': 'command' value must be a string, found #{val.class}"
+        end
+      when "link"
+        unless val.is_a?(String)
+          abort "Error: shortcut #{name}: 'link' value must be a string, found #{val.class}"
+        end
+      when "links"
+        unless val.is_a?(Array)
+          STDERR.puts "If you want to specify just one link, use 'link = \"#{val}\"'"
+          abort "Error: shortcut #{name}: 'links' must be an array, found #{val.class}"
+        end
+        val.each do |l|
+          unless l.is_a?(String)
+            abort "Error: shortcut #{name}: values in 'links' must be strings, found #{l} (#{l.class})"
+          end
+        end
+      when "shebang"
+        unless val.is_a?(String)
+          abort "Error: shortcut #{name}: 'shebang' value must be a string, found #{val.class}"
+        end
+      when "mode"
+        unless val.is_a?(String)
+          abort "Error: shortcut #{name}: 'mode' value must be an string (.e.g '0755', '0700'), found #{val.class}"
+        end
+      else
+        abort "Error: unrecognized option for shortcut #{name}: #{key}"
+      end
+    end
+
+    # everything's validated, set instance vars:
+
+    # required
+    @name = name
+    @command = toml_hash["command"]
+    # defaults
+    @shebang = toml_hash.fetch("shebang", $default[:shebang])  # already validated as string
+    if toml_hash["mode"]
+      @mode = toml_hash["mode"].to_i(8)
+    else
+      @mode = $default[:mode]
+    end
+    # optionals
+    @links = toml_hash.fetch("links", [])
+    if toml_hash["link"]
+      @links << toml_hash["link"]
+    end
+  end
+
+  # creates the shortcut file in the shortcut_dir
+  # overwrites files with the same name that already existed
+  def create_shortcut(shortcut_dir)
+    file_loc = File.join(shortcut_dir, @name)
+    if File.exists?(file_loc)
+      puts "Overwriting #{file_loc}"
+    else
+      puts "Creating #{file_loc}"
+    end
+    File.open(file_loc, "w") do |file_obj|
+      file_obj.puts "#{@shebang}\n#{@command}"
+    end
+    File.chmod(@mode, file_loc)
+    @links.each do |l|
+      link_location = File.join(shortcut_dir, l)
+      if File.exists?(link_location)
+        debug "#{link_location} already existed, deleting that file."
+        File.delete(link_location)
+      end
+      puts "Linking #{link_location}"
+      File.link(file_loc, link_location)
+    end
+  end
+
+  def to_s
+    "Shortcut(#@name, #@shebang, #@links, #{@mode.to_s(8)}, #@command)"
+  end
+end
+
+# parse and process environment variables/flags
+def process_args
+  # get default values from environment variables
+  filepaths = {
+    :config_file => ENV.fetch("SHORTCUTS_CONFIG", "#{Dir.home}/.config/shortcuts.toml"),
+    :shortcuts_dir => ENV.fetch("SHORTCUTS_DIR", "#{Dir.home}/.shortcuts"),
+  }
+
+  # parse docopt
+  begin
+    args = Docopt::docopt($doc)
+  rescue Docopt::Exit => e
+    abort e.message
+  end
+
+  $is_debug = args["--debug"]
+
+  # use command line args if they exist
+  if args["--conf"]
+    filepaths[:config_file] = args["--conf"]
+  end
+  if args["--shortcuts-dir"]
+    filepaths[:shortcuts_dir] = args["--shortcuts-dir"]
+  end
+
+  filepaths.each do |lit, path|
+    debug "#{lit.to_s} #{path}"
+  end
+
+  args.each do |flag, val|
+    debug "#{flag} #{val ? val : "nil"}"
+  end
+
+  filepaths.each { |lit, path| filepaths[lit] = Pathname.new(path) }
+
+  # verify files exist
+  filepaths.each do |lit, path|
+    unless path.dirname.exist?
+      abort "Enclosing directory #{path.dirname.to_s} does not exist."
+    end
+    case lit
+    when :config_file
+      unless path.exist?
+        debug "Creating '#{path.to_s}'"
+        File.new(path.to_path, "w").close
+      else
+        debug "'#{path.to_s}' already exists"
+      end
+    when :shortcuts_dir
+      unless path.exist?
+        debug "Creating '#{path.to_s}'"
+        path.mkdir
+      else
+        debug "'#{path.to_s}' already exists"
+      end
+    end
+  end
+  return filepaths, args
+end
+
+# parses the configuration (shortcut) script
+# returns a list of Shortcut instances, which describe
+# a shortcut each
+def parse_config(conf_location)
+  shortcut_list = []
+  conf = TomlRB.load_file(conf_location)
+  if conf.empty?
+    STDERR.puts "Warning: #{conf_location} is empty.\nSee https://raw.githubusercontent.com/seanbreckenridge/shortcuts/master/sample-config.toml for an example"
+  end
+  # verify config
+  # set global config values (strings)
+  conf.each do |name, value|
+    case name
+    when "default_shebang"
+      debug "Overwriting default_shebang value with '#{value}'"
+      if value.is_a?(String)
+        $default[:shebang] = value
+      else
+        abort "Error: expected a string for default_shebang value, found '#{value}'"
+      end
+    when "default_mode"
+      debug "Overwriting default_mode value with #{value}"
+      if value.is_a?(String)
+        $default[:mode] = value.to_i(8) # convert to octal
+      else
+        abort "Error :expected an String for default_mode value (e.g. '0700', '0755'), found '#{value}'"
+      end
+    end
+  end
+  conf.each do |shortcut_name, toml_hash|
+    if toml_hash.is_a?(Hash)
+      shortcut_list << Shortcut.new(shortcut_name, toml_hash)
+      debug shortcut_list.last.to_s
+    end
+  end
+  shortcut_list
+end
+
+if __FILE__ == $0
+  filepaths, args = process_args
+  shortcut_list = parse_config filepaths[:config_file].to_path
+  shortcut_list.each do |sc|
+    sc.create_shortcut(filepaths[:shortcuts_dir])
+  end
+end
