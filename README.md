@@ -10,6 +10,8 @@ A similar functionality could be created with aliases, but those aren't on your 
 
 This allows me to create/change scripts in one place, instead of creating/deleting/linking/copying files around in some bin directory manually.
 
+#### [My shortcuts.conf file](https://github.com/seanbreckenridge/dotfiles/blob/master/.config/shortcuts.conf)
+
 ```
 shortcuts 0.1.0
 
@@ -42,9 +44,9 @@ git clone https://github.com/seanbreckenridge/shortcuts
 cd shortcuts
 # Install dependencies
 bundler install
-# Copy shortcuts to somewhere on your $PATH
+# Copy shortcuts and config file to somewhere on your $PATH
 cp shortcuts /usr/local/bin
-cp sample-config.toml ~/.config/shortcuts.toml
+cp sample-config.toml ~/.config/shortcuts.conf
 # Add your shortcuts dir to your $PATH, by adding a line to your `.bashrc`/`.profile`/`.zshenv`: `export PATH=$PATH:~/.shortcuts`
 shortcuts create --debug
 ```

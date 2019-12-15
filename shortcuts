@@ -145,7 +145,7 @@ end
 def process_args
   # get default values from environment variables
   filepaths = {
-    :config_file => ENV.fetch("SHORTCUTS_CONFIG", "#{Dir.home}/.config/shortcuts.toml"),
+    :config_file => ENV.fetch("SHORTCUTS_CONFIG", "#{Dir.home}/.config/shortcuts.conf"),
     :shortcuts_dir => ENV.fetch("SHORTCUTS_DIR", "#{Dir.home}/.shortcuts"),
   }
 
