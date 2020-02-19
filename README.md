@@ -8,7 +8,7 @@ The scripts are described as a [toml](https://github.com/toml-lang/toml) file, s
 
 A similar functionality could be created with aliases, but those aren't on your $PATH; aren't visible to other scripts or accessible by system utilities like [rofi](https://github.com/davatorium/rofi) (the major inspiration for writing this)
 
-This allows me to create/change scripts in one place, instead of creating/deleting/linking/copying files around in some bin directory manually.
+This allows me to create/change short/one liner shell scripts in one place, instead of creating/deleting/linking/copying files around in some bin directory manually.
 
 #### [My shortcuts.toml file](https://github.com/seanbreckenridge/dotfiles/blob/master/.config/shortcuts.toml)
 
