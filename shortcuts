@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: false
 
 require "set"
 require "pathname"
@@ -7,42 +8,44 @@ require "fileutils"
 require "docopt"
 require "toml-rb"
 
-VERSION = "0.1.0"
+VERSION = "0.1.1".freeze
 
-$doc = <<DOCOPT
-shortcuts #{VERSION}
+$doc = <<~DOCOPT
+  shortcuts #{VERSION}
 
-Creates shortcut shell scripts from a configuration file.
-See https://github.com/seanbreckenridge/shortcuts for more information
+  Creates shortcut shell scripts from a configuration file.
+  See https://github.com/seanbreckenridge/shortcuts for more information
 
-Usage:
-  shortcuts create
-  shortcuts create [--conf=<FILE>] [--shortcuts-dir=<DIR>]
-  shortcuts create [--debug]
-  shortcuts -h | --help
+  Usage:
+    shortcuts create
+    shortcuts create [--conf=<FILE>] [--shortcuts-dir=<DIR>]
+    shortcuts create [--debug]
+    shortcuts -h | --help
 
-Options:
-  -h --help               Print the help message
-  -d --debug              Print debug information
-  --conf=<FILE>           Specify a configuration file
+  Options:
+    -h --help               Print the help message
+    -d --debug              Print debug information
+    --conf=<FILE>           Specify a configuration file
                           [default ~/.config/shortcuts.toml]
-  --shortcuts-dir=<DIR>   Specify a shortcuts directory
+    --shortcuts-dir=<DIR>   Specify a shortcuts directory
                           [default ~/.shortcuts/]
 
 DOCOPT
 
 $is_debug = false
-$default = { :shebang => "#!/bin/sh", :mode => 0700 }  # 0700 is octal
+$default = { shebang: "#!/bin/sh", mode: 0700 } # 0700 is octal
 
 $required_keys = ["command"]
-$allowed_keys = ["command", "shebang", "link", "links", "mode"]
+$allowed_keys = %w[command shebang link links mode]
 
 def debug(msg)
-  if $is_debug
-    puts msg
-  end
+  return unless $is_debug
+
+  puts msg
 end
 
+# Represents a shortcut.
+# Its code, file mode, links, shebang and script name
 class Shortcut
   attr_reader :command, :mode, :links, :shebang, :name
 
@@ -72,7 +75,7 @@ class Shortcut
         end
       when "links"
         unless val.is_a?(Array)
-          STDERR.puts "If you want to specify just one link, use 'link = \"#{val}\"'"
+          warn "If you want to specify just one link, use 'link = \"#{val}\"'"
           abort "Error: shortcut #{name}: 'links' must be an array, found #{val.class}"
         end
         val.each do |l|
@@ -99,12 +102,12 @@ class Shortcut
     @name = name
     @command = toml_hash["command"]
     # defaults
-    @shebang = toml_hash.fetch("shebang", $default[:shebang])  # already validated as string
-    if toml_hash["mode"]
-      @mode = toml_hash["mode"].to_i(8)
-    else
-      @mode = $default[:mode]
-    end
+    @shebang = toml_hash.fetch("shebang", $default[:shebang]) # already validated as string
+    @mode = if toml_hash["mode"]
+        toml_hash["mode"].to_i(8)
+      else
+        $default[:mode]
+      end
     # optionals
     @links = toml_hash.fetch("links", [])
     if toml_hash["link"]
@@ -116,7 +119,7 @@ class Shortcut
   # overwrites files with the same name that already existed
   def create_shortcut(shortcut_dir)
     file_loc = File.join(shortcut_dir, @name)
-    if File.exists?(file_loc)
+    if File.exist?(file_loc)
       puts "Overwriting #{file_loc}"
     else
       puts "Creating #{file_loc}"
@@ -127,7 +130,7 @@ class Shortcut
     File.chmod(@mode, file_loc)
     @links.each do |l|
       link_location = File.join(shortcut_dir, l)
-      if File.exists?(link_location)
+      if File.exist?(link_location)
         debug "#{link_location} already existed, deleting that file."
         File.delete(link_location)
       end
@@ -137,7 +140,7 @@ class Shortcut
   end
 
   def to_s
-    "Shortcut(#@name, #@shebang, #@links, #{@mode.to_s(8)}, #@command)"
+    "Shortcut(#{@name}, #{@shebang}, #@{links}, #{@mode.to_s(8)}, #@{command})"
   end
 end
 
@@ -145,13 +148,13 @@ end
 def process_args
   # get default values from environment variables
   filepaths = {
-    :config_file => ENV.fetch("SHORTCUTS_CONFIG", "#{Dir.home}/.config/shortcuts.toml"),
-    :shortcuts_dir => ENV.fetch("SHORTCUTS_DIR", "#{Dir.home}/.shortcuts"),
+    config_file: ENV.fetch("SHORTCUTS_CONFIG", "#{Dir.home}/.config/shortcuts.toml"),
+    shortcuts_dir: ENV.fetch("SHORTCUTS_DIR", "#{Dir.home}/.shortcuts"),
   }
 
   # parse docopt
   begin
-    args = Docopt::docopt($doc)
+    args = Docopt.docopt($doc)
   rescue Docopt::Exit => e
     abort e.message
   end
@@ -239,8 +242,8 @@ def parse_config(conf_location)
   shortcut_list
 end
 
-if __FILE__ == $0
-  filepaths, args = process_args
+if __FILE__ == $PROGRAM_NAME
+  filepaths, _args = process_args
   shortcut_list = parse_config filepaths[:config_file].to_path
   shortcut_list.each do |sc|
     sc.create_shortcut(filepaths[:shortcuts_dir])
