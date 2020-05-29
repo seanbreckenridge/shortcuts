@@ -10,7 +10,7 @@ A similar functionality could be created with aliases, but those aren't on your 
 
 This allows me to create/change short/one liner shell scripts in one place, instead of creating/deleting/linking/copying files around in some bin directory manually.
 
-#### [My shortcuts.toml file](https://github.com/seanbreckenridge/dotfiles/blob/master/.config/shortcuts.toml)
+#### [My shortcuts.toml file](https://gitlab.com/seanbreckenridge/dotfiles/-/blob/master/.config/shortcuts.toml)
 
 ```
 shortcuts 0.1.1
@@ -40,7 +40,7 @@ Install [`gem`](https://rubygems.org/pages/download), and [`bundle`](https://bun
 
 ```
 # Clone and cd
-git clone https://github.com/seanbreckenridge/shortcuts
+git clone https://gitlab.com/seanbreckenridge/shortcuts
 cd shortcuts
 # Install dependencies
 bundler install
