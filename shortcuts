@@ -100,7 +100,7 @@ class Shortcut
 
     # required
     @name = name
-    @command = toml_hash["command"]
+    @command = toml_hash["command"].strip
     # defaults
     @shebang = toml_hash.fetch("shebang", $default[:shebang]) # already validated as string
     @mode = if toml_hash["mode"]
@@ -125,7 +125,7 @@ class Shortcut
       puts "Creating #{file_loc}"
     end
     File.open(file_loc, "w") do |file_obj|
-      file_obj.puts "#{@shebang}\n#{@command}"
+      file_obj.puts "#{@shebang}\n#{@command}\n"
     end
     File.chmod(@mode, file_loc)
     @links.each do |l|
