@@ -4,7 +4,7 @@
 
 Some ruby to create arbitrary shell scripts - shortcuts.
 
-The scripts are described as a [toml](https://github.com/toml-lang/toml) file, see [`sample-config.toml`](./sample-config.toml) for an example. You can specify the interpreter, file mode, and any links you'd want to create, and the command itself. Running `shortcut create` creates individual shell scripts at `~/.shortcuts`.
+The scripts are described as a [toml](https://github.com/toml-lang/toml) file, see [`sample-config.toml`](./sample-config.toml) for an example. You can specify the interpreter, file mode, and any links you'd want to create, and the command itself. Running `shortcuts create` creates individual shell scripts at `~/.shortcuts`.
 
 A similar functionality could be created with aliases, but those aren't on your \$PATH; aren't visible to other scripts or accessible by system utilities like [rofi](https://github.com/davatorium/rofi) (the major inspiration for writing this). You should add the shortcut directory to your path, by adding `export PATH=$PATH:$HOME/.shortcuts` to your shell profile. If you want to use the scripts generated with system utilities, I'd recommend setting your path in `~/.profile` in a `#!/bin/sh` script, and then running `source ~/.profile` in your corresponding `bash`/`zsh` startup files.
 
