@@ -140,7 +140,7 @@ class Shortcut
   end
 
   def to_s
-    "Shortcut(#{@name}, #{@shebang}, #@{links}, #{@mode.to_s(8)}, #@{command})"
+    "Shortcut(#{@name}, #{@shebang}, #@{links}, #{@mode.to_s(8)}, #{@command})"
   end
 end
 
