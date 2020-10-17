@@ -52,6 +52,12 @@ cp sample-config.toml ~/.config/shortcuts.toml
 shortcuts create --debug
 ```
 
+If you edit this in vim, you can put the following line in your configuration, so that `shortcuts create` runs whenever you save the file:
+
+```
+autocmd BufWritePost shortcuts.toml !shortcuts create
+```
+
 #### Tests
 
 ```
