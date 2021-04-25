@@ -1,9 +1,0 @@
-language: ruby
-before_install:
-  - gem install bundler
-  - bundler install
-rvm:
-  - 2.6
-  - 2.7
-script:
-  - ruby tests.rb

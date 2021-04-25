@@ -1,26 +1,21 @@
-# These can be uncommented/changed to modify the default
-# interpreter and file mode (permissions)
+# These can be uncommented/changed to modify the default interpreter
 # default_shebang = "#!/bin/sh"
-# default_mode = "0700"
-
 # copy the date to my clipboard
 [datecpy]
-command = 'date "+%d-%m-%y" | xclip'  # only required option
+command = 'date "+%d-%m-%y" | xclip' # only required option
 
 # display htop in a new terminal window
 [thtop]
 command = "termite -e htop"
-link = "th"  # create a hardlink to thtop called th
+link = "th" # create a hardlink to thtop called th
 
 # print current git configuration
 [gitcfg]
 command = "git config --list | cat"
-links = ["gitconfig", "gcfg"]  # create multiple links
-mode = "755"  # allow anyone to read/execute this script
+links = ["gitconfig", "gcfg"] # create multiple links
 
 [test-perl]
 shebang = "#!/usr/bin/env perl"
-mode = "755"
 # multi-line 'command'
 command = '''
 use strict;

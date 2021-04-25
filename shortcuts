@@ -1,251 +1,170 @@
-#!/usr/bin/env ruby
-# frozen_string_literal: false
+#!/usr/bin/env python3
 
-require "set"
-require "pathname"
-require "fileutils"
+"""
+Converts a TOML config file to a directory of shell scripts
+"""
 
-require "docopt"
-require "toml-rb"
+from pathlib import Path
 
-VERSION = "0.1.1".freeze
+from dataclasses import dataclass, field
+from typing import List, ClassVar, Set, Dict, Any, Optional, Union
 
-$doc = <<~DOCOPT
-  shortcuts #{VERSION}
+import click
+import toml
 
-  Creates shortcut shell scripts from a configuration file.
-  See https://github.com/seanbreckenridge/shortcuts for more information
 
-  Usage:
-    shortcuts create
-    shortcuts create [--conf=<FILE>] [--shortcuts-dir=<DIR>]
-    shortcuts create [--debug]
-    shortcuts -h | --help
+Json = Dict[str, Any]
 
-  Options:
-    -h --help               Print the help message
-    -d --debug              Print debug information
-    --conf=<FILE>           Specify a configuration file
-                          [default ~/.config/shortcuts.toml]
-    --shortcuts-dir=<DIR>   Specify a shortcuts directory
-                          [default ~/.shortcuts/]
+DEFAULT_PERMISSIONS = 0o755
 
-DOCOPT
 
-$is_debug = false
-$default = { shebang: "#!/bin/sh", mode: 0700 } # 0700 is octal
+def expand_path(path: Union[Path, str]) -> Path:
+    """
+    Take a path or a string, expand '~' and convert to an absolute path
+    """
+    return Path(path).expanduser().absolute()
 
-$required_keys = ["command"]
-$allowed_keys = %w[command shebang link links mode]
 
-def debug(msg)
-  return unless $is_debug
+@dataclass
+class Config:
+    """
+    Global configuration/data for the application
+    """
 
-  puts msg
-end
+    raw: Json
+    debug: bool = False
+    shebang: str = "#!/bin/sh"
+    config_file: Path = field(default=Path("~/.config/shortcuts.toml").expanduser())
+    shortcuts_dir: Path = field(default=Path("~/.shortcuts/").expanduser())
 
-# Represents a shortcut.
-# Its code, file mode, links, shebang and script name
-class Shortcut
-  attr_reader :command, :mode, :links, :shebang, :name
+    @classmethod
+    def from_file(cls, debug: bool, config_file: str, shortcuts_dir: str) -> "Config":
+        """
+        Parse a config file, reading the default shebang value and raw shortcut values
+        """
+        with open(config_file, "r") as toml_f:
+            blob: Dict[str, Any] = dict(toml.load(toml_f).items())
+        conf = expand_path(config_file)
+        assert conf.exists(), f"config file at {conf} doesnt exist"
+        short_dir = expand_path(shortcuts_dir)
+        if short_dir.is_file():
+            raise FileExistsError(f"File exists at {short_dir}, can't create directory")
+        if not short_dir.exists():
+            short_dir.mkdir(parents=True)
 
-  def initialize(name, toml_hash)
-    if toml_hash.is_a?(Hash)
-      # check for invalid keys
-      invalid_keys = toml_hash.keys - $allowed_keys
-      unless invalid_keys.empty?
-        abort "Error: shortcut '#{name}' unrecognized option: #{invalid_keys.first}"
-      end
-      # check for required keys
-      $required_keys.each do |req|
-        unless toml_hash.key?(req)
-          abort "Error: shortcut '#{name}' is missing a required key: #{req}"
-        end
-      end
-    end
-    toml_hash.each do |key, val|
-      case key
-      when "command"
-        unless val.is_a?(String)
-          abort "Error: shortcut '#{name}': 'command' value must be a string, found #{val.class}"
-        end
-      when "link"
-        unless val.is_a?(String)
-          abort "Error: shortcut #{name}: 'link' value must be a string, found #{val.class}"
-        end
-      when "links"
-        unless val.is_a?(Array)
-          warn "If you want to specify just one link, use 'link = \"#{val}\"'"
-          abort "Error: shortcut #{name}: 'links' must be an array, found #{val.class}"
-        end
-        val.each do |l|
-          unless l.is_a?(String)
-            abort "Error: shortcut #{name}: values in 'links' must be strings, found #{l} (#{l.class})"
-          end
-        end
-      when "shebang"
-        unless val.is_a?(String)
-          abort "Error: shortcut #{name}: 'shebang' value must be a string, found #{val.class}"
-        end
-      when "mode"
-        unless val.is_a?(String)
-          abort "Error: shortcut #{name}: 'mode' value must be an string (.e.g '0755', '0700'), found #{val.class}"
-        end
-      else
-        abort "Error: unrecognized option for shortcut #{name}: #{key}"
-      end
-    end
+        # use the default shebang field from the config file otherwise the application default
+        resolved_shebang = blob.pop("default_shebang", cls.shebang)
 
-    # everything's validated, set instance vars:
+        return cls(
+            raw=blob,
+            debug=debug,
+            shebang=resolved_shebang,
+            config_file=conf,
+            shortcuts_dir=short_dir,
+        )
 
-    # required
-    @name = name
-    @command = toml_hash["command"].strip
-    # defaults
-    @shebang = toml_hash.fetch("shebang", $default[:shebang]) # already validated as string
-    @mode = if toml_hash["mode"]
-        toml_hash["mode"].to_i(8)
-      else
-        $default[:mode]
-      end
-    # optionals
-    @links = toml_hash.fetch("links", [])
-    if toml_hash["link"]
-      @links << toml_hash["link"]
-    end
-  end
 
-  # creates the shortcut file in the shortcut_dir
-  # overwrites files with the same name that already existed
-  def create_shortcut(shortcut_dir)
-    file_loc = File.join(shortcut_dir, @name)
-    if File.exist?(file_loc)
-      puts "Overwriting #{file_loc}"
-    else
-      puts "Creating #{file_loc}"
-    end
-    File.open(file_loc, "w") do |file_obj|
-      file_obj.puts "#{@shebang}\n#{@command}\n"
-    end
-    File.chmod(@mode, file_loc)
-    @links.each do |l|
-      link_location = File.join(shortcut_dir, l)
-      if File.exist?(link_location)
-        debug "#{link_location} already existed, deleting that file."
-        File.delete(link_location)
-      end
-      puts "Linking #{link_location}"
-      File.link(file_loc, link_location)
-    end
-  end
+@dataclass
+class Shortcut:
+    """
+    One shortcut - the name, any additional links and the command text
+    """
 
-  def to_s
-    "Shortcut(#{@name}, #{@shebang}, #@{links}, #{@mode.to_s(8)}, #{@command})"
-  end
-end
+    name: str
+    command: str
+    shebang: Optional[str] = None
+    links: List[str] = field(default_factory=list)
 
-# parse and process environment variables/flags
-def process_args
-  # get default values from environment variables
-  filepaths = {
-    config_file: ENV.fetch("SHORTCUTS_CONFIG", "#{Dir.home}/.config/shortcuts.toml"),
-    shortcuts_dir: ENV.fetch("SHORTCUTS_DIR", "#{Dir.home}/.shortcuts"),
-  }
+    REQUIRED_KEYS: ClassVar[Set[str]] = set(["command"])
+    ALLOWED_KEYS: ClassVar[Set[str]] = set(["links", "link", "shebang"]) | REQUIRED_KEYS
 
-  # parse docopt
-  begin
-    args = Docopt.docopt($doc)
-  rescue Docopt::Exit => e
-    abort e.message
-  end
+    @classmethod
+    def from_blob(cls, name: str, blob: Json) -> "Shortcut":
+        """
+        Convert a table loaded from TOML into a Shortcut
+        """
+        kset: Set[str] = set(blob.keys())
+        for req in cls.REQUIRED_KEYS:
+            if req not in kset:
+                assert f"{req} must be in {blob}"
+        for key in kset:
+            if key not in cls.ALLOWED_KEYS:
+                assert f"unknown key {key}; allowed keys {cls.ALLOWED_KEYS}"
 
-  $is_debug = args["--debug"]
+        # combine link string with links array
+        links: List[str] = blob.get("links", [])
 
-  # use command line args if they exist
-  if args["--conf"]
-    filepaths[:config_file] = args["--conf"]
-  end
-  if args["--shortcuts-dir"]
-    filepaths[:shortcuts_dir] = args["--shortcuts-dir"]
-  end
+        if "link" in blob:
+            links.append(blob["link"])
 
-  filepaths.each do |lit, path|
-    debug "#{lit.to_s} #{path}"
-  end
+        assert "command" in blob, f"{blob} must include 'command'"
 
-  args.each do |flag, val|
-    debug "#{flag} #{val ? val : "nil"}"
-  end
+        return cls(
+            name=name,
+            command=blob["command"],
+            shebang=blob.get("shebang"),
+            links=links,
+        )
 
-  filepaths.each { |lit, path| filepaths[lit] = Pathname.new(path) }
+    def create(self, conf: Config) -> None:
+        """
+        Combines the shebang and the links to create the corresponding scripts
+        """
+        for target_name in [self.name, *self.links]:
+            target_file: Path = conf.shortcuts_dir / target_name
+            if conf.debug:
+                click.echo(f"Creating {target_file}")
+            with target_file.open(mode="w") as target_f:
+                # use default if not specified
+                target_f.write(conf.shebang if self.shebang is None else self.shebang)
+                target_f.write("\n")
+                target_f.write(self.command)
+                target_f.write("\n")
+            target_file.chmod(DEFAULT_PERMISSIONS)
 
-  # verify files exist
-  filepaths.each do |lit, path|
-    unless path.dirname.exist?
-      abort "Enclosing directory #{path.dirname.to_s} does not exist."
-    end
-    case lit
-    when :config_file
-      unless path.exist?
-        debug "Creating '#{path.to_s}'"
-        File.new(path.to_path, "w").close
-      else
-        debug "'#{path.to_s}' already exists"
-      end
-    when :shortcuts_dir
-      unless path.exist?
-        debug "Creating '#{path.to_s}'"
-        path.mkdir
-      else
-        debug "'#{path.to_s}' already exists"
-      end
-    end
-  end
-  return filepaths, args
-end
 
-# parses the configuration (shortcut) script
-# returns a list of Shortcut instances, which describe
-# a shortcut each
-def parse_config(conf_location)
-  shortcut_list = []
-  conf = TomlRB.load_file(conf_location)
-  if conf.empty?
-    STDERR.puts "Warning: #{conf_location} is empty.\nSee https://raw.githubusercontent.com/seanbreckenridge/shortcuts/master/sample-config.toml for an example"
-  end
-  # verify config
-  # set global config values (strings)
-  conf.each do |name, value|
-    case name
-    when "default_shebang"
-      debug "Overwriting default_shebang value with '#{value}'"
-      if value.is_a?(String)
-        $default[:shebang] = value
-      else
-        abort "Error: expected a string for default_shebang value, found '#{value}'"
-      end
-    when "default_mode"
-      debug "Overwriting default_mode value with #{value}"
-      if value.is_a?(String)
-        $default[:mode] = value.to_i(8) # convert to octal
-      else
-        abort "Error :expected an String for default_mode value (e.g. '0700', '0755'), found '#{value}'"
-      end
-    end
-  end
-  conf.each do |shortcut_name, toml_hash|
-    if toml_hash.is_a?(Hash)
-      shortcut_list << Shortcut.new(shortcut_name, toml_hash)
-      debug shortcut_list.last.to_s
-    end
-  end
-  shortcut_list
-end
+def create_shortcuts(debug: bool, conf: str, shortcuts_dir: str) -> None:
+    """
+    'main' - reads files and creates shortcuts
+    """
+    config = Config.from_file(debug, conf, shortcuts_dir)
+    shortcuts: List[Shortcut] = [
+        Shortcut.from_blob(name, blob) for name, blob in config.raw.items()
+    ]
+    for shortcut in shortcuts:
+        shortcut.create(config)
 
-if __FILE__ == $PROGRAM_NAME
-  filepaths, _args = process_args
-  shortcut_list = parse_config filepaths[:config_file].to_path
-  shortcut_list.each do |sc|
-    sc.create_shortcut(filepaths[:shortcuts_dir])
-  end
-end
+
+@click.group()
+def cli() -> None:
+    """
+    Creates shortcut shell scripts from a configuration file.
+    See https://github.com/seanbreckenridge/shortcuts for more information
+    """
+
+
+@cli.command(name="create")
+@click.option("--debug/--quiet", default=False, help="Log shortcut files being created")
+@click.option(
+    "--conf",
+    envvar="SHORTCUTS_CONFIG",
+    type=click.Path(exists=True),
+    default=str(Config.config_file),
+    help="specify a configuration file",
+)
+@click.option(
+    "--shortcuts-dir",
+    envvar="SHORTCUTS_DIR",
+    type=click.Path(),
+    default=str(Config.shortcuts_dir),
+    help="specify a shortcuts directory",
+)
+def create(debug: bool, conf: str, shortcuts_dir: str) -> None:
+    """
+    Create the shell scripts!
+    """
+    create_shortcuts(debug, conf, shortcuts_dir)
+
+
+if __name__ == "__main__":
+    cli(prog_name="shortcuts")
