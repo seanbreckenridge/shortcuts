@@ -1,11 +1,12 @@
 from pathlib import Path
-from setuptools import setup
+from setuptools import setup, find_packages  # type: ignore[import]
 
 
 def main():
+    pkg = "shortcuts"
 
     setup(
-        name="shortcuts",
+        name=pkg,
         version="0.1.0",
         url="https://github.com/seanbreckenridge/shortcuts",
         author="Sean Breckenridge",
@@ -16,11 +17,12 @@ def main():
         long_description=Path("README.md").read_text(),
         long_description_content_type="text/markdown",
         license="MIT",
-        # install both as a script and a module
-        py_modules=["shortcuts"],
-        scripts=["shortcuts"],
         install_requires=Path("requirements.txt").read_text().strip().splitlines(),
+        packages=find_packages(include=[pkg]),
+        package_data={pkg: ["py.typed"]},
+        python_requires=">=3.7",
         keywords="scripting",
+        entry_points={"console_scripts": ["shortcuts = shortcuts.__main__:cli"]},
         classifiers=[
             "License :: OSI Approved :: MIT License",
             "Programming Language :: Python",
