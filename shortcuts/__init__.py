@@ -116,7 +116,7 @@ class Shortcut:
                 # use default if not specified
                 target_f.write(conf.shebang if self.shebang is None else self.shebang)
                 target_f.write("\n")
-                target_f.write(self.command)
+                target_f.write(self.command.strip())
                 target_f.write("\n")
             target_file.chmod(DEFAULT_PERMISSIONS)
 

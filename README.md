@@ -22,7 +22,7 @@ Requires python 3.7+
 
 `python3 -m pip install git+https://github.com/seanbreckenridge/shortcuts`
 
-Installs the `shortcuts` script into your `~/.local/bin`
+Should be accessible as `shortcuts` or `python3 -m shortcuts`
 
 ### Usage
 
