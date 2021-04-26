@@ -126,8 +126,5 @@ def create_shortcuts(debug: bool, conf: str, shortcuts_dir: str) -> None:
     'main' - reads files and creates shortcuts
     """
     config = Config.from_file(debug, conf, shortcuts_dir)
-    shortcuts: List[Shortcut] = [
-        Shortcut.from_blob(name, blob) for name, blob in config.raw.items()
-    ]
-    for shortcut in shortcuts:
-        shortcut.create(config)
+    for name, blob in config.raw.items():
+        Shortcut.from_blob(name, blob).create(config)
