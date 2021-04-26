@@ -18,15 +18,21 @@ def main():
         long_description_content_type="text/markdown",
         license="MIT",
         install_requires=Path("requirements.txt").read_text().strip().splitlines(),
+        extras_require={
+            ':python_version<"3.7"': [
+                "dataclasses",
+            ],
+        },
         packages=find_packages(include=[pkg]),
         package_data={pkg: ["py.typed"]},
-        python_requires=">=3.7",
+        python_requires=">=3.6",
         keywords="scripting",
         entry_points={"console_scripts": ["shortcuts = shortcuts.__main__:cli"]},
         classifiers=[
             "License :: OSI Approved :: MIT License",
             "Programming Language :: Python",
             "Programming Language :: Python :: 3",
+            "Programming Language :: Python :: 3.6",
             "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",

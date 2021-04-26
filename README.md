@@ -18,7 +18,7 @@ autocmd BufWritePost shortcuts.toml !shortcuts create
 
 ### Install
 
-Requires python 3.7+
+Requires python 3.6+
 
 `python3 -m pip install git+https://github.com/seanbreckenridge/shortcuts`
 
