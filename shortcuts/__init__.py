@@ -43,7 +43,7 @@ class Config:
         with open(config_file, "r") as toml_f:
             blob: Dict[str, Any] = dict(toml.load(toml_f).items())
         conf = expand_path(config_file)
-        assert conf.exists(), f"config file at {conf} doesnt exist"
+        assert conf.exists(), f"config file at {conf} doesn't exist"
         short_dir = expand_path(shortcuts_dir)
         if short_dir.is_file():
             raise FileExistsError(f"File exists at {short_dir}, can't create directory")
